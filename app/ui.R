@@ -8,6 +8,7 @@
 #
 
 library(shiny)
+library(leaflet)
 
 dates <- read.csv("./../data/dates.csv")
 # Define UI for application that draws a histogram
@@ -25,6 +26,7 @@ fluidPage(
             leafletOutput("map")
         ),
         sidebarPanel(
+          plotOutput("histo"),
           sliderInput("date",
                       "Date:",
                       min = as.Date(dates$date[1],"%Y-%m-%d"),
