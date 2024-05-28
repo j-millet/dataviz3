@@ -23,16 +23,22 @@ fluidPage(
 
         # Show a plot of the generated distribution
         mainPanel(
-            leafletOutput("map")
+            leafletOutput("map", width = "100%", height = "800px")
         ),
         sidebarPanel(
-          plotOutput("histo"),
+          plotOutput("plot"),
           sliderInput("date",
                       "Date:",
                       min = as.Date(dates$date[1],"%Y-%m-%d"),
                       max = as.Date(dates$date[length(dates$date)],"%Y-%m-%d"),
                       value = as.Date(dates$date[1],"%Y-%m-%d"),
-                      timeFormat="%Y-%m-%d")
+                      timeFormat="%Y-%m-%d"),
+          selectInput("selectedVar",
+                      "Variable:",
+                      c("Total Cases" = "total_cases",
+                        "Total Deaths" = "total_deaths",
+                        "New Cases" = "new_cases_smoothed")
+          )
         )
     )
 )
