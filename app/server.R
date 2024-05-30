@@ -28,7 +28,10 @@ function(input, output, session) {
       names(dataSelected)[names(dataSelected) == input$selectedVar] <- 'selected'
       dataSelected <- dataSelected %>% 
         replace_na(list(selected = 0)) %>%
-        mutate(selected_per_capita = selected/population)
+        mutate(
+          selected_per_capita = selected/population,
+          date = as.Date(date,"%Y-%m-%d")
+        )
       return(dataSelected)
       })
   
@@ -54,7 +57,10 @@ function(input, output, session) {
       
       pal <- colorNumeric(
         as.vector(paletteer::paletteer_c("ggthemes::Red-Blue Diverging",n=6,direction = -1)),
-        domain = dataSelected()$selected_per_capita
+        domain = c(
+          dataSelected() %>% filter(date <= input$date) %>% na.omit() %>% pull(selected_per_capita) %>% min() * 100,
+          dataSelected() %>% filter(date <= input$date) %>% na.omit() %>%pull(selected_per_capita) %>% max() * 100 + 1e-20
+          )
       )
       
       leaflet() %>%
@@ -62,7 +68,7 @@ function(input, output, session) {
         addPolygons(
           data = joined_geo, 
           color = "white",
-          fillColor=pal(joined_geo$selected_per_capita), 
+          fillColor=pal(joined_geo$selected_per_capita*100), 
           stroke = 0.01, 
           opacity = 0.8,
           fillOpacity=1,
@@ -79,7 +85,7 @@ function(input, output, session) {
       
       ggplot(data=cases_aggr, aes(x=date, y=sum_selected, group=1)) + 
         geom_line() + 
-        geom_vline(xintercept=match(input$date,dates), linetype="dashed", color = "red") +
+        geom_vline(xintercept=input$date, linetype="dashed", color = "red") +
         theme(axis.line=element_blank(),
                             axis.text.x=element_blank(),
                             axis.text.y=element_blank(),

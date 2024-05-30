@@ -11,8 +11,6 @@ library(shiny)
 library(leaflet)
 
 dates <- read.csv("./../data/dates.csv")
-print(dates)
-print(dates$date[1])
 # Define UI for application that draws a histogram
 fluidPage(
 
@@ -21,8 +19,6 @@ fluidPage(
 
     # Sidebar with a slider input for number of bins
     sidebarLayout(
-        
-
         # Show a plot of the generated distribution
         mainPanel(
             leafletOutput("map", width = "100%", height = "800px")
