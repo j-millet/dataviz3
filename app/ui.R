@@ -11,6 +11,8 @@ library(shiny)
 library(leaflet)
 
 dates <- read.csv("./../data/dates.csv")
+print(dates)
+print(dates$date[1])
 # Define UI for application that draws a histogram
 fluidPage(
 

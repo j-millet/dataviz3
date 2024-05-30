@@ -1,7 +1,10 @@
+library(dplyr)
+
 data <- read.csv("./covid-data.csv")
-dates <- data %>% select(date) %>% unique() %>% arrange(date) %>%pull(date) %>% as.Date("%Y-%m-%d")
+dates <- data %>% select(date) %>% unique() %>% arrange(date) %>% pull(date) %>% as.Date("%Y-%m-%d")
+dates <- data.frame(date=dates)
 #save dates as csv
-write.csv(dates, file = "./dates.csv", row.names = FALSE)
+write.csv(dates, file = "./dates.csv", row.names = FALSE,col.names = c('date'))
 
 library(ggplot2)
 
