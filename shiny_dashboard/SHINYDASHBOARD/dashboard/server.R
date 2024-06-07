@@ -11,7 +11,9 @@ library(htmlwidgets)
 library(rmapshaper)
 library(shinyjs)
 
-covid_monthly <- read.csv("../covid-data-monthly.csv") %>% replace_na(list(total_cases=0,total_deaths=0,new_cases_smoothed=0)) 
+covid_monthly <- read.csv("../covid-data-monthly.csv") %>% 
+  mutate(month = as.Date(month,"%Y-%m-%d")) %>%
+  filter(month <= as.Date("2022-02-01","%Y-%m-%d"))
 geopoly <- read_sf("../countries.geojson")
 geopoly <- rmapshaper::ms_simplify(geopoly,keep=0.1)
 
@@ -38,6 +40,7 @@ get_country_rank_per_capita <- function(data,country_iso_code,variable){
 
 function(input, output,session) {
   shinyjs::hide(id = "myBox")
+  
   output$logo <- renderImage({
     list(src = "logo.svg", width = 100, height = 100)
   })
@@ -79,7 +82,17 @@ function(input, output,session) {
     
     
     pal <- colorNumeric(
-      as.vector(paletteer::paletteer_c("ggthemes::Red-Blue Diverging",n=6,direction = -1)),
+      as.vector(
+        paletteer::paletteer_c(
+          ifelse(
+            input$selectedVar %in% c("total_cases","total_deaths","new_cases","icu_patients","hosp_patients"),#bad
+            "ggthemes::Red-Blue Diverging",
+            "ggthemes::Green-Blue Diverging"
+            ),
+          n=20,
+          direction = -1
+          )
+        ),
       domain = c(
         data %>% filter(month <= inputmonth) %>% na.omit() %>% pull(selected_per_capita) %>% min() * 100,
         data %>% filter(month <= inputmonth) %>% na.omit() %>%pull(selected_per_capita) %>% max() * 100 + 1e-20
@@ -149,38 +162,61 @@ function(el, x) {
     
   })
   
+  output$selected_name <- renderText({
+    if(input$country_clicked != ""){
+      country_name <- covid_monthly %>% filter(iso_code == input$country_clicked) %>% unique() %>% pull(location)
+      return(paste(country_name[1]))
+    }
+    return("World")
+  })
+  
   output$stats <- renderUI({
     rank_cases <- get_country_rank(covid_monthly,input$country_clicked,total_cases)
     rank_deaths <- get_country_rank(covid_monthly,input$country_clicked,total_deaths)
     rank_cases_per_capita <- get_country_rank_per_capita(covid_monthly,input$country_clicked,total_cases)
     rank_deaths_per_capita <- get_country_rank_per_capita(covid_monthly,input$country_clicked,total_deaths)
+    rank_people_vaccinated <- get_country_rank(covid_monthly,input$country_clicked,people_fully_vaccinated)
+    rank_people_vaccinated_per_capita <- get_country_rank_per_capita(covid_monthly,input$country_clicked,people_fully_vaccinated)
+    
     country_name <- covid_monthly %>% filter(iso_code == input$country_clicked) %>% unique() %>% pull(location)
     
     box(title = paste(country_name[1], " statistics"), width = 12, status = "primary", solidHeader = F, 
         column(width=11,
-               column(width=6,
+               column(width=4,
                 valueBox(
-                 value = get_country_rank(covid_monthly,input$country_clicked,total_cases),
+                 value = rank_cases,
                  subtitle = "Total Cases Rank",
                  color = ifelse(rank_cases < 10,"red",ifelse(rank_cases < 50,"yellow","green"))
                ),
                valueBox(
-                 value = get_country_rank_per_capita(covid_monthly,input$country_clicked,total_cases),
+                 value = rank_cases_per_capita,
                  subtitle = "Total Cases Rank Per Capita",
                  color = ifelse(rank_cases_per_capita < 10,"red",ifelse(rank_cases_per_capita < 50,"yellow","green"))
                )),
-               column(width=6,
+               column(width=4,
                valueBox(
-                 value = get_country_rank(covid_monthly,input$country_clicked,total_deaths),
+                 value = rank_deaths,
                  subtitle = "Total Deaths Rank",
                  color = ifelse(rank_deaths < 10,"red",ifelse(rank_deaths < 50,"yellow","green"))
                ),
                
                valueBox(
-                 value = get_country_rank_per_capita(covid_monthly,input$country_clicked,total_deaths),
+                 value = rank_deaths_per_capita,
                  subtitle = "Total Deaths Rank Per Capita",
                  color = ifelse(rank_deaths_per_capita < 10,"red",ifelse(rank_deaths_per_capita < 50,"yellow","green"))
-               ))),
+               )),
+               column(width=4,
+                      valueBox(
+                        value = rank_people_vaccinated,
+                        subtitle = "Total Vaccinations Rank",
+                        color = ifelse(rank_people_vaccinated < 50,"green",ifelse(rank_people_vaccinated < 120,"yellow","red"))
+                      ),
+                      
+                      valueBox(
+                        value = rank_people_vaccinated_per_capita,
+                        subtitle = "Total Vaccinations Rank Per Capita",
+                        color = ifelse(rank_people_vaccinated_per_capita < 50,"green",ifelse(rank_people_vaccinated_per_capita < 120,"yellow","red"))
+                      ))),
         column(width=1,actionButton("reset", "Close")))
       
     
@@ -189,7 +225,8 @@ function(el, x) {
     updateTextInput(session,'country_clicked', value = "")
   })
   output$covidTable <- renderDT({
-    covid_monthly %>% select(month,location,total_cases,total_deaths,new_cases_smoothed) %>% 
+    covid_monthly %>% 
+      select(-iso_code) %>%
       mutate(month = as.Date(month,"%Y-%m-%d")) %>%
       datatable(
         style="bootstrap",

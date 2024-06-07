@@ -6,7 +6,7 @@ library(dplyr)
 library(plotly)
 library(shinyjs)
 
-months <- read.csv("../covid-data-monthly.csv") %>% select(month) %>% unique() %>% arrange(month) %>% pull(month)
+months <- read.csv("../covid-data-monthly.csv") %>% select(month) %>% unique() %>% arrange(month) %>% filter(month <= as.Date("2022-02-01","%Y-%m-%d")) %>% pull(month)
 tags$script("
     Shiny.addCustomMessageHandler('open_panel', function(value) {
     Shiny.setInputValue('open_panel', value);
@@ -36,6 +36,7 @@ dashboardPage(
                 box(title = "COVID-19 Cases Map", width = 12, status = "primary", solidHeader = TRUE, 
                     column(width=8,leafletOutput("covidMap", width = "100%", height = "600px")),
                     column(width=4,
+                           textOutput("selected_name"),
                            plotOutput("selected_plot"),
                            sliderInput("date",
                                        "Month:",
@@ -47,7 +48,11 @@ dashboardPage(
                             "Variable:",
                             c("Total Cases" = "total_cases",
                               "Total Deaths" = "total_deaths",
-                              "New Cases" = "new_cases_smoothed"))
+                              "New Cases" = "new_cases",
+                              "ICU Patients" = "icu_patients",
+                              "Hospitalized Patients" = "hosp_patients",
+                              "Total Tests" = "total_tests",
+                              "People Fully Vaccinated" = "people_fully_vaccinated"))
                            
                           )
                     ),
@@ -61,7 +66,8 @@ dashboardPage(
               )),
       tabItem(tabName = "table",
               fluidRow(
-                box(title = "Summary Table", width = 12, status = "primary", solidHeader = TRUE, DTOutput("covidTable"))
+                box(title = "Summary Table", width = 12, status = "primary", solidHeader = TRUE, 
+                    DT::dataTableOutput("covidTable"),style = "overflow-x: scroll;")
               )),
       tabItem(tabName = "trends",
               fluidRow(

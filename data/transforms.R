@@ -1,8 +1,14 @@
 library(dplyr)
 library(tidyr)
 library(sf)
-data <- read.csv("./covid-data.csv") %>% 
-  select(iso_code,location,date,total_cases,total_deaths,new_cases_smoothed,population) %>% 
+data <- read.csv("./covid-data.csv") 
+
+data <- data %>% 
+  select(iso_code,location,date,total_cases,total_deaths,new_cases,
+         population,
+         icu_patients,hosp_patients,new_tests,total_tests,
+         total_vaccinations,people_vaccinated,people_fully_vaccinated,total_boosters,new_vaccinations) %>% 
+  replace_na(list(total_cases=0,total_deaths=0,new_cases_smoothed=0,icu_patients=0,hosp_patients=0,new_tests_smoothed=0,total_tests=0,total_vaccinations=0,people_vaccinated=0,people_fully_vaccinated=0,total_boosters=0,new_vaccinations=0)) %>%
   mutate(
     date = as.Date(date,"%Y-%m-%d"),
     month = as.Date(cut(date, breaks = "month"))
@@ -12,13 +18,18 @@ data <- read.csv("./covid-data.csv") %>%
   summarise(
     total_cases = max(total_cases),
     total_deaths = max(total_deaths),
-    new_cases_smoothed = max(new_cases_smoothed)
-  ) %>%
-  ungroup()
-dates <- data %>% select(date) %>% unique() %>% arrange(date) %>% pull(date) %>% as.Date("%Y-%m-%d")
-dates <- data.frame(date=dates)
-#save dates as csv
-write.csv(dates, file = "./dates.csv", row.names = FALSE,col.names = c('date'))
+    new_cases = sum(new_cases),
+    icu_patients = max(icu_patients),
+    hosp_patients = max(hosp_patients),
+    new_tests = sum(new_tests),
+    total_tests = max(total_tests),
+    total_vaccinations = max(total_vaccinations),
+    people_vaccinated = max(people_vaccinated),
+    people_fully_vaccinated = max(people_fully_vaccinated),
+    total_boosters = max(total_boosters),
+    new_vaccinations = sum(new_vaccinations)) %>%
+  ungroup() %>% 
+  replace_na(list(new_tests=0))
 
 write.csv(data, file = "./covid-data-monthly.csv", row.names = FALSE)
 library(ggplot2)
