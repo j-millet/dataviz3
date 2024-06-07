@@ -1,17 +1,32 @@
 library(dplyr)
-
-data <- read.csv("./covid-data.csv")
+library(tidyr)
+library(sf)
+data <- read.csv("./covid-data.csv") %>% 
+  select(iso_code,location,date,total_cases,total_deaths,new_cases_smoothed,population) %>% 
+  mutate(
+    date = as.Date(date,"%Y-%m-%d"),
+    month = as.Date(cut(date, breaks = "month"))
+  ) %>%
+  select(-date) %>%
+  group_by(iso_code,location,month,population) %>% 
+  summarise(
+    total_cases = max(total_cases),
+    total_deaths = max(total_deaths),
+    new_cases_smoothed = max(new_cases_smoothed)
+  ) %>%
+  ungroup()
 dates <- data %>% select(date) %>% unique() %>% arrange(date) %>% pull(date) %>% as.Date("%Y-%m-%d")
 dates <- data.frame(date=dates)
 #save dates as csv
 write.csv(dates, file = "./dates.csv", row.names = FALSE,col.names = c('date'))
 
+write.csv(data, file = "./covid-data-monthly.csv", row.names = FALSE)
 library(ggplot2)
 
 geopoly <- read_sf("./countries.geojson")
 iso = data %>% select(iso_code) %>% unique()
 dayData <- data %>% 
-  filter(date == input$date) %>% 
+  filter(month == as.Date("2021-01-01","%Y-%m-%d")) %>% 
   select(location,iso_code, new_cases_smoothed,population)
 
 dayData <- iso %>% 
@@ -23,6 +38,7 @@ dayData <- dayData %>%
 
 joined_geo <- geopoly %>% left_join(dayData, by = c("ISO_A3" = "iso_code")) %>% replace_na(list(new_cases_smoothed_per_capita = 0))
 
+library(leaflet)
 leaflet() %>%
   #addTiles() %>%
   setView(lng = 0, lat = 50, zoom = 2) %>%
@@ -33,7 +49,7 @@ leaflet() %>%
     stroke = 0, 
     opacity = 0.8,
     fillOpacity=1,
-    label = ~paste0(sovereignt, ": New cases per 100k: ", total_cases))
+    label = ~paste0(location, ": New cases per 100k: ", new_cases_smoothed))
 
 
 
