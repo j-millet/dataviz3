@@ -33,8 +33,9 @@ dashboardPage(
     tabItems(
       tabItem(tabName = "map",
               fluidRow(
-                box(title = "COVID-19 Cases Map", width = 12, status = "primary", solidHeader = TRUE, 
-                    column(width=8,leafletOutput("covidMap", width = "100%", height = "600px")),
+                box(id="myBox",textInput("country_clicked", "Country Clicked:",value=""),style='display:none;text-color:rgba(0,0,0,0);'),
+                box(title = "COVID-19 Cases Map", width = 12,height = 7, status = "primary", solidHeader = TRUE,
+                    column(width=8,leafletOutput("covidMap", width = "100%",height = "600px")),
                     column(width=4,
                            textOutput("selected_name"),
                            plotOutput("selected_plot"),
@@ -59,7 +60,6 @@ dashboardPage(
                 #panel for the pop-up graph
                 conditionalPanel(
                   condition = "input.country_clicked != ''",
-                  box(id="myBox",textInput("country_clicked", "Country Clicked:",value="")),
                   uiOutput("stats")
                 )
                 

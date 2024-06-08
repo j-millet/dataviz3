@@ -10,6 +10,7 @@ library(htmltools)
 library(htmlwidgets)
 library(rmapshaper)
 library(shinyjs)
+library(stringr)
 
 covid_monthly <- read.csv("../covid-data-monthly.csv") %>% 
   mutate(month = as.Date(month,"%Y-%m-%d"))
@@ -19,16 +20,18 @@ geopoly <- rmapshaper::ms_simplify(geopoly,keep=0.05)
 covid_monthly <- covid_monthly %>% filter(iso_code %in% geopoly$ISO_A3) 
 
 iso = covid_monthly %>% select(iso_code) %>% unique()
+country_populations <- covid_monthly %>% select(iso_code,population) %>% unique()
 
 geopoly <- geopoly %>% filter(ADMIN != "Antarctica") #turns out penguins can't get COVID-19
 
 get_country_rank <- function(data,country_iso_code,variable){
-  data %>% 
+  r <- data %>% 
     filter(month == max(month)) %>%
     arrange(desc({{variable}})) %>%
     mutate(rank = row_number()) %>%
     filter(iso_code == country_iso_code) %>%
     pull(rank)
+  r[1]
 }
 
 get_country_rank_per_capita <- function(data,country_iso_code,variable){
@@ -38,7 +41,7 @@ get_country_rank_per_capita <- function(data,country_iso_code,variable){
 
 
 function(input, output,session) {
-  shinyjs::hide(id = "myBox")
+  
   
   output$logo <- renderImage({
     list(src = "logo.svg", width = 100, height = 100)
@@ -58,6 +61,23 @@ function(input, output,session) {
   })
   
   output$covidMap <- renderLeaflet({
+    
+    leaflet(geopoly) %>%
+      setView(lng = 0, lat = 50, zoom = 1.5) %>%
+      setMaxBounds(lng1 = -180, lat1 = -90, lng2 = 180, lat2 = 90) %>%
+      addPolygons(
+        data = geopoly, 
+        color = "white",
+        fillColor="grey", 
+        stroke = 0.01, 
+        opacity = 0.8,
+        fillOpacity=1,
+        layerId = ~ISO_A3,
+        group = "countries"
+      )
+  })
+  
+  updateMap <- function(input){
     data <- filteredData()
     inputmonth <- as.Date(cut(input$date, breaks = "month"))
     dayData <- data %>% 
@@ -66,7 +86,9 @@ function(input, output,session) {
     
     dayData <- iso %>% 
       left_join(dayData, by = c("iso_code" = "iso_code")) %>% 
-      replace_na(list(selected = 0,population=1))
+      replace_na(list(selected = 0)) %>%
+      select(-population) %>% 
+      inner_join(country_populations, by = c("iso_code" = "iso_code"))
     
     joined_geo <- geopoly %>% 
       left_join(dayData, by = c("ISO_A3" = "iso_code")) %>% 
@@ -74,7 +96,7 @@ function(input, output,session) {
     
     joined_geo$label <- paste(
       paste("<strong>",joined_geo$ADMIN,"</strong>"),
-      paste("<strong>",input$selectedVar,"</strong>: ", format(joined_geo$selected, big.mark = ",", scientific = FALSE)), 
+      paste("<strong>",str_to_sentence(gsub("_"," ",input$selectedVar)),"</strong>: ", format(joined_geo$selected, big.mark = ",", scientific = FALSE)), 
       paste("<strong>Population:</strong> ", format(joined_geo$population, big.mark = ",", scientific = FALSE)), 
       paste("<strong>Percent of population:</strong> ", format(round(joined_geo$selected_per_capita*100,4), nsmall=4, scientific = FALSE),"%"),
       sep="<br/>") %>% lapply(htmltools::HTML)
@@ -87,32 +109,19 @@ function(input, output,session) {
             input$selectedVar %in% c("total_cases","total_deaths","new_cases","icu_patients","hosp_patients"),#bad
             "ggthemes::Red-Blue Diverging",
             "ggthemes::Green-Blue Diverging"
-            ),
+          ),
           n=20,
           direction = -1
-          )
-        ),
+        )
+      ),
       domain = c(
         data %>% filter(month <= inputmonth) %>% na.omit() %>% pull(selected_per_capita) %>% min() * 100,
         data %>% filter(month <= inputmonth) %>% na.omit() %>%pull(selected_per_capita) %>% max() * 100 + 1e-20
       )
     )
-    js_code <- "
-function(el, x) {
-  this.eachLayer(function(layer) {
-    if (layer instanceof L.Polygon) {
-      layer.on('click', function(e) {
-        var countryName = layer.options.layerId;
-        console.log(countryName);
-        Shiny.setInputValue('country_clicked', countryName);
-        Shiny.setInputValue('open_panel', 'T');
-      });
-    }
-  });
-}
-"
-    leaflet(joined_geo) %>%
-      setView(lng = 0, lat = 50, zoom = 2) %>%
+    
+    leafletProxy("covidMap") %>%
+      clearGroup("countries") %>%
       addPolygons(
         data = joined_geo, 
         color = "white",
@@ -123,11 +132,18 @@ function(el, x) {
         label = ~label,
         layerId = ~ISO_A3,
         group = "countries"
-      ) %>% 
-      onRender(js_code)
+      )
+  }
   
+  observeEvent(input$date,{
+    updateMap(input)
   })
-  
+  observeEvent(input$selectedVar,{
+    updateMap(input)
+  })
+  observeEvent(input$covidMap_shape_click,{
+    updateTextAreaInput(session,'country_clicked', value = input$covidMap_shape_click$id)
+  })
   output$selected_plot <- renderPlot({
     cases_aggr <- filteredData() %>% 
       select(month,selected,iso_code)
@@ -170,6 +186,29 @@ function(el, x) {
   })
   
   output$stats <- renderUI({
+    choose_color_bad <- function(rank){
+      if(is.na(rank)){
+        return("yellow")
+      }else if(rank < 10){
+        return("red")
+      } else if(rank < 50){
+        return("yellow")
+      } else {
+        return("green")
+      }
+    }
+    choose_color_good <- function(rank){
+      if(is.na(rank)){
+        return("yellow")
+      }else if(rank < 50){
+        return("green")
+      } else if(rank < 120){
+        return("yellow")
+      } else {
+        return("red")
+      }
+    }
+    
     rank_cases <- get_country_rank(covid_monthly,input$country_clicked,total_cases)
     rank_deaths <- get_country_rank(covid_monthly,input$country_clicked,total_deaths)
     rank_cases_per_capita <- get_country_rank_per_capita(covid_monthly,input$country_clicked,total_cases)
@@ -177,44 +216,47 @@ function(el, x) {
     rank_people_vaccinated <- get_country_rank(covid_monthly,input$country_clicked,people_fully_vaccinated)
     rank_people_vaccinated_per_capita <- get_country_rank_per_capita(covid_monthly,input$country_clicked,people_fully_vaccinated)
     
+    if(is.na(rank_cases) || is.na(rank_deaths) || is.na(rank_cases_per_capita) || is.na(rank_deaths_per_capita) || is.na(rank_people_vaccinated) || is.na(rank_people_vaccinated_per_capita)){
+      return("")
+    }
     country_name <- covid_monthly %>% filter(iso_code == input$country_clicked) %>% unique() %>% pull(location)
     
-    box(title = paste(country_name[1], " statistics"), width = 12, status = "primary", solidHeader = F, 
+    box(title = paste(country_name[1], " statistics"), width = 12,height = 3, status = "primary", solidHeader = F, 
         column(width=11,
                column(width=4,
                 valueBox(
                  value = rank_cases,
-                 subtitle = "Total Cases Rank",
-                 color = ifelse(rank_cases < 10,"red",ifelse(rank_cases < 50,"yellow","green"))
+                 subtitle = "Total Cases Rank                ",
+                 color = choose_color_bad(rank_cases)
                ),
                valueBox(
                  value = rank_cases_per_capita,
-                 subtitle = "Total Cases Rank Per Capita",
-                 color = ifelse(rank_cases_per_capita < 10,"red",ifelse(rank_cases_per_capita < 50,"yellow","green"))
+                 subtitle = "Total Cases Per Capita Rank",
+                 color = choose_color_bad(rank_cases_per_capita)
                )),
                column(width=4,
                valueBox(
                  value = rank_deaths,
                  subtitle = "Total Deaths Rank",
-                 color = ifelse(rank_deaths < 10,"red",ifelse(rank_deaths < 50,"yellow","green"))
+                 color = choose_color_bad(rank_deaths)
                ),
                
                valueBox(
                  value = rank_deaths_per_capita,
-                 subtitle = "Total Deaths Rank Per Capita",
-                 color = ifelse(rank_deaths_per_capita < 10,"red",ifelse(rank_deaths_per_capita < 50,"yellow","green"))
+                 subtitle = "Total Deaths Per Capita Rank",
+                 color = choose_color_bad(rank_deaths_per_capita)
                )),
                column(width=4,
                       valueBox(
                         value = rank_people_vaccinated,
-                        subtitle = "Total Vaccinations Rank",
-                        color = ifelse(rank_people_vaccinated < 50,"green",ifelse(rank_people_vaccinated < 120,"yellow","red"))
+                        subtitle = "Total People Vaccinated Rank",
+                        color = choose_color_good(rank_people_vaccinated)
                       ),
                       
                       valueBox(
                         value = rank_people_vaccinated_per_capita,
-                        subtitle = "Total Vaccinations Rank Per Capita",
-                        color = ifelse(rank_people_vaccinated_per_capita < 50,"green",ifelse(rank_people_vaccinated_per_capita < 120,"yellow","red"))
+                        subtitle = "Total People Vaccinated Per Capita Rank",
+                        color = choose_color_good(rank_people_vaccinated_per_capita)
                       ))),
         column(width=1,actionButton("reset", "Close")))
       
