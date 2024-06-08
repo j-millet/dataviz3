@@ -43,8 +43,8 @@ get_country_rank_per_capita <- function(data,country_iso_code,variable){
 function(input, output,session) {
   
   
-  output$logo <- renderImage({
-    list(src = "logo.svg", width = 100, height = 100)
+  output$logo <- renderText({
+    HTML("<img style=\"width:90%; height:auto; padding:5%; position:absolute; bottom:0;\" src=\"https://raw.githubusercontent.com/j-millet/dataviz3/shinydashv2/shiny_dashboard/SHINYDASHBOARD/logo.svg?token=GHSAT0AAAAAACTCG75JVLCY5A2E3ZDW7P4AZTE2MNQ\">")
   })
   
   filteredData <- reactive({
@@ -165,16 +165,9 @@ function(input, output,session) {
     ggplot(data=cases_aggr, aes(x=month, y=sum_selected, group=1)) + 
       geom_line() + 
       geom_vline(xintercept=input$date, linetype="dashed", color = "red") +
-      theme(axis.line=element_blank(),
-            axis.title.x=element_blank(),
-            axis.title.y=element_blank(),
-            legend.position="none",
-            panel.background=element_blank(),
-            panel.border=element_blank(),
-            panel.grid.major=element_blank(),
-            panel.grid.minor=element_blank(),
-            plot.background=element_blank())
-    
+      labs(x = "Month", y = "") +
+      theme_minimal() 
+      
   })
   
   output$selected_name <- renderText({
@@ -222,6 +215,8 @@ function(input, output,session) {
     country_name <- covid_monthly %>% filter(iso_code == input$country_clicked) %>% unique() %>% pull(location)
     
     box(title = paste(country_name[1], " statistics"), width = 12,height = 3, status = "primary", solidHeader = F, 
+        tags$style(type="text/css", "#reset { margin-top: 0px; } .small-box{height:15vh; width:100%;} "),
+        column(width=1,actionButton("reset", "✗")),
         column(width=11,
                column(width=4,
                 valueBox(
@@ -257,8 +252,7 @@ function(input, output,session) {
                         value = rank_people_vaccinated_per_capita,
                         subtitle = "Total People Vaccinated Per Capita Rank",
                         color = choose_color_good(rank_people_vaccinated_per_capita)
-                      ))),
-        column(width=1,actionButton("reset", "Close")))
+                      ))))
       
     
   })

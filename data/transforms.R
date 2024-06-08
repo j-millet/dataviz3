@@ -2,7 +2,7 @@ library(dplyr)
 library(tidyr)
 library(sf)
 data <- read.csv("./covid-data.csv") 
-
+any(is.na(c(NA,2)))
 data <- data %>% 
   select(iso_code,location,date,total_cases,total_deaths,new_cases,
          population,
