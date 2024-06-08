@@ -12,10 +12,9 @@ library(rmapshaper)
 library(shinyjs)
 
 covid_monthly <- read.csv("../covid-data-monthly.csv") %>% 
-  mutate(month = as.Date(month,"%Y-%m-%d")) %>%
-  filter(month <= as.Date("2022-02-01","%Y-%m-%d"))
+  mutate(month = as.Date(month,"%Y-%m-%d"))
 geopoly <- read_sf("../countries.geojson")
-geopoly <- rmapshaper::ms_simplify(geopoly,keep=0.1)
+geopoly <- rmapshaper::ms_simplify(geopoly,keep=0.05)
 
 covid_monthly <- covid_monthly %>% filter(iso_code %in% geopoly$ISO_A3) 
 
