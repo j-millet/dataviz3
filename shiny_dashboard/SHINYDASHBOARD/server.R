@@ -46,7 +46,7 @@ function(input, output,session) {
   
   
   output$logo <- renderText({
-    HTML("<img style=\"width:90%; height:auto; padding:5%; position:absolute; bottom:0;\" src=\"https://raw.githubusercontent.com/j-millet/dataviz3/shinydashv2/shiny_dashboard/SHINYDASHBOARD/logo.svg?token=GHSAT0AAAAAACTCG75JVLCY5A2E3ZDW7P4AZTE2MNQ\">")
+    HTML("<img style=\"width:90%; height:auto; padding:5%; position:absolute; bottom:0;\" src=\"https://raw.githubusercontent.com/j-millet/dataviz3/main/shiny_dashboard/SHINYDASHBOARD/logo.svg\">")
   })
   
   filteredData <- reactive({
