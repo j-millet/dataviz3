@@ -4,33 +4,155 @@ output:
   flexdashboard::flex_dashboard:
     orientation: columns
     vertical_layout: fill
+runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
 library(flexdashboard)
+library(shiny)
+library(dplyr)
+library(sf)
+library(leaflet)
+library(tidyr)
+library(ggplot2)
+library(paletteer)
+library(htmltools)
+library(htmlwidgets)
+
+data <- read.csv("./../data/covid-data-monthly.csv")
+
+
+months <- data %>% select(month) %>% unique() %>% arrange(month) %>% pull(month)
+
+geopoly <- read_sf("./../data/countries.geojson")
+iso = data %>% select(iso_code) %>% unique()
+
+dataSelected <- reactive({
+      dataSelected <- data %>% select(all_of(input$selectedVar),location,iso_code,month,population)
+      names(dataSelected)[names(dataSelected) == input$selectedVar] <- 'selected'
+      dataSelected <- dataSelected %>% 
+        replace_na(list(selected = 0)) %>%
+        mutate(
+          selected_per_capita = selected/population,
+          )
+      return(dataSelected)
+      })
+
 ```
 
 Column {data-width=650}
 -----------------------------------------------------------------------
 
-### Chart A
+### Map
 
 ```{r}
 
+renderLeaflet({
+      dayData <- dataSelected() %>% 
+        filter(month == as.Date(cut(input$month, breaks = "month"),"%Y-%m-%d")) %>% 
+        select(location,iso_code, selected,population,selected_per_capita)
+      
+      dayData <- iso %>% 
+        left_join(dayData, by = c("iso_code" = "iso_code")) %>% 
+        replace_na(list(selected = 0,population=1))
+      
+      joined_geo <- geopoly %>% 
+        left_join(dayData, by = c("ISO_A3" = "iso_code")) %>% 
+        replace_na(list(selected_per_capita = 0))
+      
+      joined_geo$label <- paste(
+          paste("<strong>",joined_geo$ADMIN,"</strong>"),
+          paste("<strong>",input$selectedVar,"</strong>: ", format(joined_geo$selected, big.mark = ",", scientific = FALSE)), 
+          paste("<strong>Population:</strong> ", format(joined_geo$population, big.mark = ",", scientific = FALSE)), 
+          paste("<strong>Percent of population:</strong> ", format(round(joined_geo$selected_per_capita*100,4), nsmall=4, scientific = FALSE),"%"),
+          sep="<br/>") %>% lapply(htmltools::HTML)
+
+      
+      pal <- colorNumeric(
+        as.vector(paletteer::paletteer_c("ggthemes::Red-Blue Diverging",n=6,direction = -1)),
+        domain = c(
+          dataSelected() %>% filter(month <= input$month) %>% na.omit() %>% pull(selected_per_capita) %>% min() * 100,
+          dataSelected() %>% filter(month <= input$month) %>% na.omit() %>%pull(selected_per_capita) %>% max() * 100 + 1e-20
+          )
+      )
+      js_code <- "
+function(el, x) {
+  this.eachLayer(function(layer) {
+    if (layer instanceof L.Polygon) {
+      layer.on('click', function(e) {
+        var countryName = layer.options.layerId;
+        Shiny.setInputValue('country_clicked', countryName);
+      });
+    }
+  });
+}
+"
+      leaflet(joined_geo) %>%
+        setView(lng = 0, lat = 50, zoom = 2) %>%
+        addPolygons(
+          data = joined_geo, 
+          color = "white",
+          fillColor=pal(joined_geo$selected_per_capita*100), 
+          stroke = 0.01, 
+          opacity = 0.8,
+          fillOpacity=1,
+          label = ~label,
+          layerId = ~ISO_A3,
+          group = "countries"
+        ) %>% 
+        onRender(js_code)
+    })
+
+    
 ```
+
 
 Column {data-width=350}
 -----------------------------------------------------------------------
-
-### Chart B
+```{r}
+renderPlot({
+      cases_aggr <- dataSelected() %>% 
+        select(month,selected) %>%
+        mutate(month = as.Date(month,"%Y-%m-%d"))%>%
+        group_by(month) %>% 
+        arrange(month) %>% 
+        summarise(sum_selected = sum(selected))
+      
+      ggplot(data=cases_aggr, aes(x=month, y=sum_selected, group=1)) + 
+        geom_line() + 
+        geom_vline(xintercept=input$month, linetype="dashed", color = "red") +
+        theme(axis.line=element_blank(),
+                            axis.text.x=element_blank(),
+                            axis.text.y=element_blank(),
+                            axis.ticks=element_blank(),
+                            axis.title.x=element_blank(),
+                            axis.title.y=element_blank(),
+                            legend.position="none",
+                            panel.background=element_blank(),
+                            panel.border=element_blank(),
+                            panel.grid.major=element_blank(),
+                            panel.grid.minor=element_blank(),
+                            plot.background=element_blank())
+      
+    })
+```
+### Controls
 
 ```{r}
 
+  sliderInput("month",
+                      "Month:",
+                      min = as.Date(months[1],"%Y-%m-%d"),
+                      max = as.Date(months[length(months)],"%Y-%m-%d"),
+                      value = as.Date(months[1],"%Y-%m-%d"),
+                      timeFormat="%Y-%m")
+  selectInput("selectedVar",
+              "Variable:",
+               c("Total Cases" = "total_cases",
+                "Total Deaths" = "total_deaths",
+                "New Cases" = "new_cases_smoothed")
+          )
+  renderText({
+    input$country_clicked
+  })
 ```
-
-### Chart C
-
-```{r}
-
-```
-
