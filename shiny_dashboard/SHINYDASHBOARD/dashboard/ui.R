@@ -67,10 +67,22 @@ dashboardPage(
               )),
       tabItem(tabName = "stats",
               fluidPage(
-                box(title = "New cases", width = 12, status = "primary", solidHeader = TRUE, plotlyOutput("covidTrends")),
-                box(title = "Total cases", width = 12, status = "primary", solidHeader = TRUE, plotlyOutput("covidStats")),
-                box(title = "Total deaths", width = 12, status = "primary", solidHeader = TRUE, plotlyOutput("covidDemographics")),
-                box(title = "Vaccinations", width = 12, status = "primary", solidHeader = TRUE, plotlyOutput("covidHealthcare"))
+                box(title = "Country trends", width = 12, status = "primary", solidHeader = TRUE, 
+                    column(width=10,
+                      plotlyOutput("covidTrends")),
+                    column(width=2,
+                           h4("Select a variable to plot:"),
+                           selectInput("selectedVar",
+                                       "Variable:",
+                                       c("Total Cases" = "total_cases",
+                                         "Total Deaths" = "total_deaths",
+                                         "New Cases" = "new_cases",
+                                         "ICU Patients" = "icu_patients",
+                                         "Hospitalized Patients" = "hosp_patients",
+                                         "Total Tests" = "total_tests",
+                                         "People Fully Vaccinated" = "people_fully_vaccinated"))
+                           )
+                    )
               )),
       tabItem(tabName="globalStats",
               fluidPage(

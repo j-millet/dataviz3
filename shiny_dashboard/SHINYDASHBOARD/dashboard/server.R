@@ -273,23 +273,8 @@ function(input, output,session) {
   })
   
   output$covidTrends <- renderPlotly({
-    plot_ly(data = covid_monthly, x = ~month, y = ~new_cases, color = ~location, type = 'scatter', mode = 'lines') %>%
-      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = "New Cases"))
-  })
-  
-  output$covidStats <- renderPlotly({
-    plot_ly(data = covid_monthly, x = ~month, y = ~total_cases, color = ~location, type = 'scatter', mode = 'lines') %>%
-      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = "Total Cases"))
-  })
-  
-  output$covidDemographics <- renderPlotly({
-    plot_ly(data = covid_monthly, x = ~month, y = ~total_deaths, color = ~location, type = 'scatter', mode = 'lines') %>%
-      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = "Total Deaths"))
-  })
-  
-  output$covidHealthcare <- renderPlotly({
-    plot_ly(data = covid_monthly, x = ~month, y = ~people_fully_vaccinated, color = ~location, type = 'scatter', mode = 'lines') %>%
-      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = "People Fully Vaccinated"))
+    plot_ly(data = filteredData(), x = ~month, y = ~selected, color = ~location, type = 'scatter', mode = 'lines') %>%
+      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = str_to_sentence(gsub("_"," ",input$selectedVar))))
   })
 
   
