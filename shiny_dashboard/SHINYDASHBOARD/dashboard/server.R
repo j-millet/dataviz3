@@ -11,6 +11,7 @@ library(htmlwidgets)
 library(rmapshaper)
 library(shinyjs)
 library(stringr)
+library(viridisLite)
 
 covid_monthly <- read.csv("../covid-data-monthly.csv") %>% 
   mutate(month = as.Date(month,"%Y-%m-%d"))
@@ -272,30 +273,40 @@ function(input, output,session) {
   })
   
   output$covidTrends <- renderPlotly({
-    data <- filteredData()
-    
-    plot_ly(data, x = ~Date, y = ~Confirmed, type = 'scatter', mode = 'lines') %>%
-      layout(title = "COVID-19 Confirmed Cases Over Time", xaxis = list(title = "Date"), yaxis = list(title = "Confirmed Cases"))
+    plot_ly(data = covid_monthly, x = ~month, y = ~new_cases, color = ~location, type = 'scatter', mode = 'lines') %>%
+      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = "New Cases"))
   })
   
   output$covidStats <- renderPlotly({
-    data <- filteredData()
-    
-    plot_ly(data, x = ~Date, y = ~Deaths, type = 'bar') %>%
-      layout(title = "COVID-19 Deaths Over Time", xaxis = list(title = "Date"), yaxis = list(title = "Deaths"))
+    plot_ly(data = covid_monthly, x = ~month, y = ~total_cases, color = ~location, type = 'scatter', mode = 'lines') %>%
+      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = "Total Cases"))
   })
   
   output$covidDemographics <- renderPlotly({
-    data <- filteredData()
-    
-    plot_ly(data, x = ~Date, y = ~Recovered, type = 'scatter', mode = 'lines+markers') %>%
-      layout(title = "COVID-19 Recoveries Over Time", xaxis = list(title = "Date"), yaxis = list(title = "Recoveries"))
+    plot_ly(data = covid_monthly, x = ~month, y = ~total_deaths, color = ~location, type = 'scatter', mode = 'lines') %>%
+      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = "Total Deaths"))
   })
   
   output$covidHealthcare <- renderPlotly({
-    data <- filteredData()
-    
-    plot_ly(data, x = ~Date, y = ~Active, type = 'scatter', mode = 'lines') %>%
-      layout(title = "Active COVID-19 Cases Over Time", xaxis = list(title = "Date"), yaxis = list(title = "Active Cases"))
+    plot_ly(data = covid_monthly, x = ~month, y = ~people_fully_vaccinated, color = ~location, type = 'scatter', mode = 'lines') %>%
+      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"), yaxis = list(title = "People Fully Vaccinated"))
   })
+
+  
+  output$covidTrendsGlobal <- renderPlotly({
+    global_data <- covid_monthly %>% group_by(month) %>%
+      summarize(new_cases = sum(new_cases, na.rm = TRUE),
+                total_cases = sum(total_cases, na.rm = TRUE),
+                total_deaths = sum(total_deaths, na.rm = TRUE),
+                people_fully_vaccinated = sum(people_fully_vaccinated, na.rm = TRUE))
+    
+    plot_ly(data = global_data, x = ~month) %>%
+      add_trace(y = ~new_cases, name = "New Cases", type = 'scatter', mode = 'lines') %>%
+      add_trace(y = ~total_cases, name = "Total Cases", type = 'scatter', mode = 'lines') %>%
+      add_trace(y = ~total_deaths, name = "Total Deaths", type = 'scatter', mode = 'lines') %>%
+      add_trace(y = ~people_fully_vaccinated, name = "People Fully Vaccinated", type = 'scatter', mode = 'lines') %>%
+      layout(xaxis = list(title = "Month", tickformat = "%Y-%m"),
+             yaxis = list(title = "Count"))
+  })
+  
 }
